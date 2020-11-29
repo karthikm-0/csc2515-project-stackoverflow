@@ -35,7 +35,7 @@ QUERY = (
     'SELECT tag_name '
     'FROM `bigquery-public-data.stackoverflow.tags` '
     'ORDER BY count DESC '
-    'LIMIT 40'
+    'LIMIT 20'
 )
 
 query_job = client.query(QUERY)
@@ -50,7 +50,7 @@ tag_list_tuple = tuple(tag_list_tuple)
 
 # QUERYING FOR MOST POPULAR TAGS
 QUERY_TWO = (
-    'SELECT * '
+    'SELECT title, body, tags '
     'FROM `bigquery-public-data.stackoverflow.posts_questions` '
     'WHERE tags IN {}'.format(tag_list_tuple)
 )
@@ -61,4 +61,4 @@ print(type(rows))
 
 df = rows.to_dataframe()
 print(df)
-#df.to_csv('query.csv')
+df.to_csv('query.csv')

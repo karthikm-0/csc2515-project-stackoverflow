@@ -45,7 +45,7 @@ tag_list_tuple = []
 for row in rows:
     tag_list_tuple.append(row.tag_name)
 
-#tag_list_tuple = ["thread-sleep", "lol"]
+#tag_list_tuple = ["vba", "na"]
 tag_list_tuple = tuple(tag_list_tuple)
 
 # QUERYING FOR MOST POPULAR TAGS
@@ -60,5 +60,5 @@ rows = query_job.result()
 print(type(rows))
 
 df = rows.to_dataframe()
-print(df)
-df.to_csv('query.csv')
+print(df.shape)
+#df.to_csv('query.csv')

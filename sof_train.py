@@ -13,6 +13,8 @@ from nltk.corpus import stopwords
 import nltk
 nltk.download('stopwords')
 
+from sklearn.linear_model import LogisticRegression
+
 ''' This script is being used to train models on the top nine languages 
 that we have filtered froma  previous script (stackoverflow10.py). First I tried
 simple models but currently am in the process of testing Word2Vec '''
@@ -88,7 +90,10 @@ def apply_word2vec(X, w2v, dim):
         for words in X
     ])
 
+# Tokenize all data here
 tokenized = tokenize('Title')
+questions_tags_combined['tokenized'] = tokenized
+print(questions_tags_combined)
 
 # X_train, X_test, y_train, y_test = pre_processing('Title', 'Tag')
 model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary = True)
@@ -113,3 +118,76 @@ print(vector)'''
 #tokenized_embedding_list = [model[token] for token in tokenized if token in model.vocab]
 #print(tokenized_embedding_list.head(5))
 
+# Train Word2Vec
+train, test, y_train, y_test = train_test_split(questions_tags_combined.drop(columns='Tag'),
+                                                questions_tags_combined['Tag'], test_size=.2,
+                                                stratify=questions_tags_combined['Tag'])
+tokenized_list = []
+for sentence in train['tokenized']:
+    tokenized_list.extend(sentence)
+
+print("Number of sentences: {}.".format(len(tokenized_list)))
+print("Number of rows: {}.".format(len(train)))
+
+num_features = 300
+min_word_count = 3
+num_workers = 4
+context = 8
+downsampling = 1e-3
+
+w2vmodel = gensim.models.Word2Vec(sentences=tokenized_list, sg=1, hs=0,
+                                  workers=num_workers, size=num_features, min_count=min_word_count,
+                                  window=context, sample=downsampling, negative=5, iter=6)
+
+
+# Generate sentence vectors from our tokenized sentence of words
+def sentence_vectors(model, sentence):
+    sentences = [sentence]
+    # Collecting all words in the text
+    words = np.concatenate(sentences)
+    # Collecting words that are known to the model
+    model_voc = set(model.wv.vocab.keys())
+
+    sent_vector = np.zeros(model.vector_size, dtype="float32")
+
+    # Use a counter variable for number of words in a text
+    nwords = 0
+    # Sum up all words vectors that are know to the model
+    for word in words:
+        if word in model_voc:
+            sent_vector += model[word]
+            nwords += 1.
+
+    # Now get the average
+    if nwords > 0:
+        sent_vector /= nwords
+    return sent_vector
+
+# Convert this into a consistent set of features for each training and test example
+def vectors_to_feats(df, ndim):
+    index=[]
+    for i in range(ndim):
+        df[f'w2v_{i}'] = df['train_vectors'].apply(lambda x: x[i])
+        index.append(f'w2v_{i}')
+    return df[index]
+
+# Train
+train['train_vectors'] = list(map(lambda sen_group: sentence_vectors(w2vmodel, sen_group), train['tokenized']))
+X_train = vectors_to_feats(train, 300)
+print(X_train.head())
+
+# Test
+test['train_vectors'] = list(map(lambda sen_group: sentence_vectors(w2vmodel, sen_group), test['tokenized']))
+X_test=vectors_to_feats(test, 300)
+print(X_test.head())
+
+# Results
+X_train.to_csv('train_sentence_vector_features.csv')
+X_test.to_csv('test_sentence_vector_features.csv')
+
+# Logistic Regression Model
+clf = LogisticRegression(max_iter=4000)
+clf.fit(X_train, y_train)
+predict = clf.predict(X_test)
+
+print(classification_report(y_test, predict))
